@@ -21,4 +21,4 @@
 3. Run main.ipynb
 
 ## Implementation of DTUMOS-Paratransit
-### [visualization](https://camuslab.github.io/dtumos-paratransit-simulation/) | [report](https://camuslab.github.io/dtumos-paratransit-report/)
+### [VISUALIZATION](https://camuslab.github.io/dtumos-paratransit-simulation/) | [REPORT](https://camuslab.github.io/dtumos-paratransit-report/)
