@@ -20,5 +20,5 @@
     ```
 3. Run main.ipynb
 
-## Implementation of DTUMOS-Disabled CallTaxi
+## Implementation of DTUMOS-Paratransit
 ### [visualization](https://camuslab.github.io/dtumos-paratransit-simulation/) | [report](https://camuslab.github.io/dtumos-paratransit-report/)
