@@ -1,0 +1,9 @@
+scenario,realization,save_path,n,request_failure_pct,service_delay_pct,avg_wait_min,elapsed_min
+C,0,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/C_r0/simulation_1,5931,3.136,7.798,12.244,34.2
+BC,0,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BC_r0/simulation_1,5931,2.681,5.561,11.024,33.8
+BC,4,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BC_r4/simulation_1,6011,4.458,4.91,11.116,33.9
+BC,3,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BC_r3/simulation_1,6099,4.689,4.886,10.95,33.9
+BC,1,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BC_r1/simulation_1,5993,3.754,5.548,11.314,34.1
+BC,2,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BC_r2/simulation_1,6080,4.984,6.059,11.69,35.1
+BC,5,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BC_r5/simulation_1,6061,4.141,5.904,11.438,36.2
+BD,0,/private/tmp/claude-501/-Users-jihoyeo-Library-CloudStorage-OneDrive----research--------paper-TR-A/bb969a78-2e8a-4095-bd20-aedfac7c4300/scratchpad/campaign/simul_result/BD_r0/simulation_1,4575,9.158,8.614,14.001,23.3

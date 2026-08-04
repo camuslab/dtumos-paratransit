@@ -1,2 +1,16 @@
-./visualization/simulation/node_modules/
-./visualization/simulation/build/
+visualization/simulation/node_modules/
+visualization/simulation/build/
+
+.DS_Store
+.env
+__pycache__/
+*.pyc
+
+# Large local archives / raw source data (not tracked)
+_시뮬레이션_정리_*
+data/(서울시)특별교통수단/
+
+# Large per-run simulation outputs (keep record.csv & summary files only)
+revision_runs_2026/**/trip.json
+revision_runs_2026/**/vehicle_marker.json
+revision_runs_2026/**/passenger_marker.json
