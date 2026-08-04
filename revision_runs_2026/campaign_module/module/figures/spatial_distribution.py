@@ -89,10 +89,10 @@ def figure_6_7_N_8_9(base_path, place_geometry, mapboxKey, time_range, status='p
         sliders=sliders,
         updatemenus=play_button,
         mapbox={
-            'accesstoken': mapboxKey,
+            
             'center':{"lat": place_geometry['lat'].iloc[0], "lon":place_geometry['lon'].iloc[0]},
             'zoom':10,
-            'style':'light'},
+            'style':'carto-positron'},
         margin = {'l':0, 'r':0, 'b':80, 't':0},
     )
 
@@ -106,10 +106,10 @@ def figure_6_7_N_8_9(base_path, place_geometry, mapboxKey, time_range, status='p
 
     layout_basic = go.Layout(
         mapbox={
-            'accesstoken': mapboxKey,
+            
             'center':{"lat": place_geometry['lat'].iloc[0], "lon":place_geometry['lon'].iloc[0]},
             'zoom':10,
-            'style':'light'},
+            'style':'carto-positron'},
         margin = {'l':0, 'r':0, 'b':0, 't':0},
         template="plotly_white"
     )
@@ -157,8 +157,8 @@ def figure_10(base_path, place_geometry, region_boundary, mapboxKey, save_path =
                             zoom=10)
     fig_10.update_layout(
         mapbox={
-            'accesstoken':mapboxKey,
-            'style':'light'},
+            
+            'style':'carto-positron'},
         margin={"r":0,"t":0,"l":0,"b":0},
         )
 
@@ -198,8 +198,8 @@ def figure_11(base_path, place_geometry, region_boundary, mapboxKey, save_path =
                             zoom=10)
     fig_11.update_layout(
         mapbox={
-            'accesstoken':mapboxKey,
-            'style':'light'},
+            
+            'style':'carto-positron'},
         margin={"r":0,"t":0,"l":0,"b":0},
         )
 
