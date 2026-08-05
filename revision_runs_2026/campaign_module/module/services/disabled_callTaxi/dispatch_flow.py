@@ -55,7 +55,7 @@ def change_travel_time_to_eta_result(data, time, simul_configs):
 
 def address_current_active_vehicle(current_active_vehicle, time, save_path, simul_configs):
 
-    # 0. osrm 경로 추출
+    # 0. extract osrm routes
     O = current_active_vehicle[['lat', 'lon', 'P_ride_lat', 'P_ride_lon']].values
     D = current_active_vehicle[['P_ride_lat', 'P_ride_lon', 'P_alight_lat', 'P_alight_lon']].values
     
@@ -68,7 +68,7 @@ def address_current_active_vehicle(current_active_vehicle, time, save_path, simu
         routing_result_O = [osrm_routing_machine(o) for o in O]
         routing_result_D = [osrm_routing_machine(d) for d in D]
 
-    # 1. ETA model이 있으면 적용하여 travel time 조정
+    # 1. if an ETA model exists, apply it to adjust travel time
     if simul_configs['eta_model'] != None: 
         
         eta_result_O = change_travel_time_to_eta_result(O, time, simul_configs)
@@ -88,14 +88,14 @@ def address_current_active_vehicle(current_active_vehicle, time, save_path, simu
             routing_result_D[idx]['timestamp'] = revision_timestamp_D
 
 
-    # *add_board_time  (dwell_sigma 설정 시 TruncNormal 확률 dwell)
+    # *add_board_time  (with dwell_sigma set, stochastic TruncNormal dwell)
     for idx in range(len(routing_result_D)):
         _bt = simul_configs['add_board_time']
         if simul_configs.get('dwell_sigma'):
             _bt = float(np.clip(np.random.normal(_bt, simul_configs['dwell_sigma']), 2, 25))
         routing_result_D[idx]['timestamp'] = (np.array(routing_result_D[idx]['timestamp']) + _bt).tolist()
     
-    # 2. P_disembark_time D 마지막 시간으로 변경
+    # 2. set P_disembark_time to the last timestamp of D
     current_active_vehicle['P_disembark_time'] = [time+o['timestamp'][-1]+d['timestamp'][-1] for o,d in zip(routing_result_O, routing_result_D)]
     # *add_disembark_time 
     _dt = simul_configs['add_disembark_time']
@@ -103,7 +103,7 @@ def address_current_active_vehicle(current_active_vehicle, time, save_path, simu
         _dt = np.clip(np.random.normal(_dt, simul_configs['dwell_sigma'], size=len(current_active_vehicle)), 2, 25)
     current_active_vehicle['P_disembark_time'] = current_active_vehicle['P_disembark_time'] + _dt
     
-    # 3. vehicle marker 저장
+    # 3. save vehicle markers
     vehicle_marker_inf = current_active_vehicle.loc[current_active_vehicle['temporary_stopTime'] != time]
     vehicle_marker_inf = vehicle_marker_inf.loc[~(vehicle_marker_inf['temporary_stopTime'].isna())].reset_index(drop=True)
     if len(vehicle_marker_inf) >= 1:
@@ -116,7 +116,7 @@ def address_current_active_vehicle(current_active_vehicle, time, save_path, simu
         save_json_data(vehicle_marker_inf, save_path=save_path, file_name='vehicle_marker')
     del vehicle_marker_inf
 
-    # 4. passenger marker 저장
+    # 4. save passenger markers
     passenger_marker_inf = current_active_vehicle[['P_ID', 'P_ride_lat', 'P_ride_lon', 'P_request_time']]
     passenger_marker_inf['P_ride_time'] = [o['timestamp'][-1]+time for o in routing_result_O]
     
@@ -130,7 +130,7 @@ def address_current_active_vehicle(current_active_vehicle, time, save_path, simu
         save_json_data(passenger_marker_inf, save_path=save_path, file_name='passenger_marker')
     del passenger_marker_inf
 
-    # 5. trip 저장
+    # 5. save trips
     O_route = [o['route'] for o in routing_result_O]
     D_route = [d['route'] for d in routing_result_D]
     O_timestamp =[list(np.array(o['timestamp'])+time) for o in routing_result_O]
@@ -163,7 +163,7 @@ def address_current_active_vehicle(current_active_vehicle, time, save_path, simu
     
     return current_active_vehicle
 
-## dispatch 방법 및 cost matrix 계산 방법 결정
+## Determine dispatch method and cost matrix calculation method
 from module.dispatch_cost import dispatch_cost_matrix
 from module.dispatch import in_order_dispatch, ortools_dispatch
 
@@ -185,13 +185,13 @@ def dispatch_methods(requested_passenger, empty_vehicle, simul_configs, time):
                                             simul_configs)
 
     ## Matching complete
-    # - dispatch 성공 차량 & 승객
-    # - 승객 괜찮은데, 차량은 계속 차량 타입 가지고 가야됨!! (추후 수정)
+    # - successfully dispatched vehicles & passengers
+    # - passengers are fine, but vehicles must keep carrying the vehicle type!! (fix later)
 
     dispatch_result_vehicle = empty_vehicle.iloc[dispatch_result['vehicle']][['vehicle_id', 'cartype', 'work_end', 'temporary_stopTime', 'lat', 'lon']].reset_index(drop=True)
     dispatch_result_passenger = requested_passenger.iloc[dispatch_result['passenger']][['ID', 'ride_lat', 'ride_lon', 'alight_lat', 'alight_lon', 'ride_time', 'dispatch_time']].reset_index(drop=True)
 
-    # - dispatch 성공 데이터 하나로 합침
+    # - merge successful dispatch data into one
     current_active_vehicle = pd.concat([dispatch_result_vehicle, dispatch_result_passenger], axis=1)
     current_active_vehicle = current_active_vehicle.rename(columns={'ID':'P_ID', 
                                                                     'ride_lat':'P_ride_lat',
@@ -202,7 +202,7 @@ def dispatch_methods(requested_passenger, empty_vehicle, simul_configs, time):
     current_active_vehicle['P_disembark_time'] = 0
 
     ## Not match
-    # - 남은 empty_vehicle, requested_passenger
+    # - remaining empty_vehicle, requested_passenger
     empty_vehicle = empty_vehicle.iloc[list(set(empty_vehicle.index)-set(dispatch_result['vehicle']))].reset_index(drop=True)
     requested_passenger = requested_passenger.iloc[list(set(requested_passenger.index)-set(dispatch_result['passenger']))].reset_index(drop=True)
 
@@ -217,8 +217,8 @@ def part_of_dispatch_main(requested_passenger, active_vehicle, empty_vehicle, si
     
     check_variable = True
     
-    ## 휠체어 승객 우선 배차를 위해 A(휠체어O), B(휠체어X)로 데이터 분리 
-    # - 휠체어 우선 배차                                            
+    ## To prioritize wheelchair passengers, split data into A (wheelchair) and B (non-wheelchair)
+    # - wheelchair-priority dispatch
 
     requested_passenger = requested_passenger.reset_index(drop=True)
     empty_vehicle = empty_vehicle.reset_index(drop=True)
@@ -254,7 +254,7 @@ def part_of_dispatch_main(requested_passenger, active_vehicle, empty_vehicle, si
     else:
         check_variable = False
 
-    ## 현재 시간에 활성화된 데이터 trip, point 저장 후 => current_active_vehicle 데이터로 반환
+    ## Save trip and point data active at the current time => return as current_active_vehicle data
     if check_variable:
         if len(current_active_vehicle) >= 1:
             current_active_vehicle = address_current_active_vehicle(current_active_vehicle, time, save_path, simul_configs)
@@ -266,7 +266,7 @@ def part_of_dispatch_main(requested_passenger, active_vehicle, empty_vehicle, si
 
 def dispatch_main(requested_passenger, active_vehicle, empty_vehicle, simul_configs, time):
 
-    # batched_greedy: 도착그룹 분할 없이 전체 대기열을 대기시간 내림차순(오래 기다린 순)으로 단일 배치 처리
+    # batched_greedy: process the whole queue as a single batch, sorted by waiting time descending (longest wait first), without splitting into arrival groups
     if simul_configs['dispatch_mode'] == 'batched_greedy':
         requested_passenger = requested_passenger.sort_values('dispatch_time', ascending=False, kind='stable').reset_index(drop=True)
         return part_of_dispatch_main(requested_passenger, active_vehicle, empty_vehicle, simul_configs, time)

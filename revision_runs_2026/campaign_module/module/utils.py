@@ -1,16 +1,16 @@
-### 비슷한 단어 선택
+### Select similar words
 from difflib import get_close_matches
 def select_similar_word(word_to_compare, candidates):
 
-    n = 1 # 최대 문자 매칭 개수
-    cutoff = 0.6 # 유사도 하한
+    n = 1 # maximum number of matches
+    cutoff = 0.6 # similarity lower bound
     
     close_matches = get_close_matches(word_to_compare, candidates, n, cutoff)
 
     return close_matches
 
 ### haversine
-# - 위도, 경도를 통해 거리를 측정 (반환 km)
+# - measure distance from latitude/longitude (returns km)
 import numpy as np
 def calculate_straight_distance(lat1, lon1, lat2, lon2):
     km_constant = 3959* 1.609344
@@ -22,7 +22,7 @@ def calculate_straight_distance(lat1, lon1, lat2, lon2):
     km = km_constant * c
     return km
 
-### route로 km 단위의 거리를 반환
+### Return distance in km from a route
 # import numpy as np
 def route_distance_calculater(data):
     distance = []
@@ -35,13 +35,13 @@ def route_distance_calculater(data):
     return distance 
 
 
-### meter를 위도, 경도 유클리드 거리로 변환
+### Convert meters to a lat/lon Euclidean distance
 import osmnx as ox
 def euclid_distance_cal(meter):
 
-    #점 쌍 사이의 유클리드 거리를 계산
+    #compute the Euclidean distance between a pair of points
     dis_1 = ox.distance.euclidean_dist_vec(36.367658 , 127.447499, 36.443928, 127.419678)
-    #직선거리 계산
+    #compute the straight-line distance
     dis_2 = ox.distance.great_circle_vec(36.367658 , 127.447499, 36.443928, 127.419678)
 
     return dis_1/dis_2 * meter

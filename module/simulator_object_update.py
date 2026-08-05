@@ -6,8 +6,8 @@ import numpy as np
 ###########################
 # Passenger status update #
 ###########################
-# - 1. passenger에서 활성(요청) 필요 데이터 추출
-# - 2. passenger 설정된 fail_time 만큼 되면 실패 상태로 전환 or 넘지 않으면 dispatch_time +1
+# - 1. Extract the active (requested) data needed from passenger
+# - 2. Switch a passenger to failed status once the configured fail_time is reached, otherwise dispatch_time +1
 def update_passenger(requested_passenger, fail_passenger, passenger, simul_configs, time):
     
     fail_time = simul_configs['fail_time']
@@ -47,14 +47,14 @@ def update_passenger(requested_passenger, fail_passenger, passenger, simul_confi
 # Vehicle status update #
 #########################
 # active_vehicle, empty_vehicle columns : ['vehicle_id', 'work_end', 'temporary_stopTime', 'geometry', 'P_ID', 'P_ride_geometry', 'P_alight_geometry', 'P_disembark_time']
-# - 1. 출근 차량 체크
-# - 2. 운행 중인 차량 승객 하차 체크 
-# - 3. 퇴근 차량 체크
+# - 1. Check vehicles starting work
+# - 2. Check passenger dropoff for operating vehicles
+# - 3. Check vehicles ending work
 def update_vehicle(active_vehicle, empty_vehicle, vehicle, simul_configs, time):
     
     save_path = simul_configs['save_path']
     
-    # 출근 체크
+    # check work start
     current_start_vehicle = vehicle.loc[(vehicle['work_start'] == time)]
     
     if len(current_start_vehicle) > 0:
@@ -79,13 +79,13 @@ def update_vehicle(active_vehicle, empty_vehicle, vehicle, simul_configs, time):
         vehicle = vehicle.loc[(vehicle['work_start'] != time)]
         vehicle = vehicle.reset_index(drop=True)
         
-    # 승객 내림 체크
+    # check passenger dropoff
     if len(active_vehicle) > 0:
         
         current_empty_vehicle = active_vehicle.loc[(active_vehicle['P_disembark_time'] <= time)].copy()
         
         if len(current_empty_vehicle) > 0:
-            # 현재 승객 내린 차량 update
+            # update vehicles whose passengers just alighted
             current_empty_vehicle['lat'] = current_empty_vehicle['P_alight_lat']
             current_empty_vehicle['lon'] = current_empty_vehicle['P_alight_lon']
             current_empty_vehicle['temporary_stopTime'] = current_empty_vehicle['P_disembark_time']
@@ -100,11 +100,11 @@ def update_vehicle(active_vehicle, empty_vehicle, vehicle, simul_configs, time):
             empty_vehicle = pd.concat([empty_vehicle, current_empty_vehicle])
             empty_vehicle = empty_vehicle.reset_index(drop=True)
             
-            # 아직 운행 중인 차량 update
+            # update vehicles still operating
             active_vehicle = active_vehicle.loc[(active_vehicle['P_disembark_time'] > time)]
             active_vehicle = active_vehicle.reset_index(drop=True)
             
-    # 퇴근 체크
+    # check work end
     if len(empty_vehicle) > 0: 
         
         end_vehicle = empty_vehicle.loc[(empty_vehicle['work_end'] < time+5)] 
@@ -115,7 +115,7 @@ def update_vehicle(active_vehicle, empty_vehicle, vehicle, simul_configs, time):
         
         if len(end_vehicle) > 0:
             
-            # temporary_stopTime이 NaN인 경우는 퇴근 차량이지만 relocation을 하다가 바로 퇴근을 해서 vehicle marker가 필요 없는 경a우임 
+            # If temporary_stopTime is NaN, the vehicle ended work right after relocation, so no vehicle marker is needed
             if 'cartype' in current_start_vehicle.columns:
                 end_vehicle = [{'vehicle_id':row['vehicle_id'], 'cartype':row['cartype'],
                                 'location': [row['lon'], row['lat']], 

@@ -22,3 +22,12 @@
 
 ## Implementation of DTUMOS-Paratransit
 ### [VISUALIZATION](https://camuslab.github.io/dtumos-paratransit-simulation/) | [REPORT](https://camuslab.github.io/dtumos-paratransit-report/)
+
+## Data Availability
+
+The raw paratransit trip records, agent-level simulation inputs, and per-run
+simulation outputs used in this project contain sensitive mobility information
+about individuals with disabilities and are therefore **not distributed** in
+this repository. Only the simulation framework code, analysis scripts, and
+aggregate scenario results are public. Requests for data access should be
+directed to the corresponding author.

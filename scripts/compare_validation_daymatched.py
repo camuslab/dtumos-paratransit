@@ -1,20 +1,21 @@
-"""Day-matched empirical validation — 2024 입력 재실행 결과 vs 같은 날짜 실측.
+"""Day-matched empirical validation — 2024-input rerun results vs observed data on the same dates.
 
-passenger_2024/passenger_{i}는 실제 2024년 날짜(days.csv)의 전체 접수(취소 포함,
-서울 내, 실좌표)이므로, simulation_{i+1} 결과를 그 날짜의 실측과 1:1로 비교한다.
-기존 합성일 pooled 비교(compare_validation.py)보다 강한 검증.
+passenger_2024/passenger_{i} holds all requests for an actual 2024 date (days.csv;
+including cancellations, Seoul-internal, real coordinates), so the simulation_{i+1}
+results are compared 1:1 with the observed data for that date.
+A stronger validation than the pooled synthetic-day comparison (compare_validation.py).
 
-사용법 (시뮬레이션 완료 후) — campaign 레이아웃 ({scenario}_r{N}/simulation_1/):
+Usage (after simulations finish) — campaign layout ({scenario}_r{N}/simulation_1/):
     python scripts/compare_validation_daymatched.py \
         --sim-dir revision_runs_2026/campaign_fast/simul_result --scenario base_y24
 
-r{N} = passenger_{N} = days.csv N번째 날짜.
+r{N} = passenger_{N} = the N-th date in days.csv.
 
-정의 (compare_validation.py와 동일):
-- 시뮬 실패 = 30분 내 미배차 (내생) → 실측 하한 = 배차 전 접수취소, 상한 = 배차 30분 초과·미배차
-- 시뮬 대기 = 요청→승차 → 실측 = 30분 내 배차된 완료 운행의 (승차 - 희망)
+Definitions (same as compare_validation.py):
+- sim failure = no dispatch within 30 min (endogenous) → observed lower bound = pre-dispatch cancellations, upper bound = dispatch beyond 30 min or never dispatched
+- sim waiting = request→pickup → observed = (pickup - desired time) of completed trips dispatched within 30 min
 
-산출물 → revision/analysis/10_empirical_validation/daymatched_*
+Outputs → revision/analysis/10_empirical_validation/daymatched_*
 """
 
 import argparse
@@ -28,24 +29,24 @@ from scipy.stats import ks_2samp, spearmanr
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("/Users/jihoyeo/Library/CloudStorage/OneDrive-개인/research/장애인콜택시/paper/TR_A/revision/analysis/10_empirical_validation")
-RAW_2024 = PROJECT_ROOT / "data/(서울시)특별교통수단/서울_2024_로우데이터.parquet"
+RAW_2024 = PROJECT_ROOT / "data/seoul_paratransit_raw/seoul_2024_raw.parquet"
 DAYS_CSV = PROJECT_ROOT / "data/simulation-agent-data/passenger_2024/days.csv"
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--sim-dir", required=True, help="simul_result 폴더 ({scenario}_r{N}/simulation_1 구조)")
-ap.add_argument("--scenario", default="base_y24", help="시나리오 라벨 (기본 base_y24)")
+ap.add_argument("--sim-dir", required=True, help="simul_result folder ({scenario}_r{N}/simulation_1 layout)")
+ap.add_argument("--scenario", default="base_y24", help="scenario label (default base_y24)")
 args = ap.parse_args()
 SIM_DIR = Path(args.sim_dir) if Path(args.sim_dir).is_absolute() else PROJECT_ROOT / args.sim_dir
 
 days = pd.read_csv(DAYS_CSV)
 run_date = {n: pd.Timestamp(d).date() for n, d in enumerate(days["date"])}  # r{N} = passenger_{N}
 
-# ---------- 시뮬레이션 ----------
+# ---------- Simulation ----------
 sim_rows = []
 for run, date in run_date.items():
     f = SIM_DIR / f"{args.scenario}_r{run}" / "simulation_1" / "passenger_marker.json"
     if not f.exists():
-        print(f"[스킵] {f} 없음 — 아직 실행 중이면 완료 후 다시 실행")
+        print(f"[skip] {f} missing — if runs are still in progress, rerun after they finish")
         continue
     p = pd.read_json(f)
     p["start"] = p["timestamp"].str[0]
@@ -55,14 +56,14 @@ for run, date in run_date.items():
     p["run"] = run
     sim_rows.append(p)
 if not sim_rows:
-    raise SystemExit("시뮬레이션 결과가 하나도 없습니다.")
+    raise SystemExit("No simulation results found.")
 sim = pd.concat(sim_rows, ignore_index=True)
 HOURS = sorted(sim["hour"].unique())
 sim_succ = sim[sim["status"] == 1].copy()
 sim_succ["waiting_time"] = sim_succ["end"] - sim_succ["start"]
 sim_succ = sim_succ.dropna(subset=["waiting_time"])
 
-# ---------- 실측 (같은 날짜) ----------
+# ---------- Observed data (same dates) ----------
 df = pd.read_parquet(RAW_2024)
 df = df[(df["출발시"] == "서울특별시") & (df["목적시"] == "서울특별시") & df["희망일시"].notna()]
 df["date"] = df["희망일시"].dt.date
@@ -81,7 +82,7 @@ def r2(y, yhat):
     return 1 - np.sum((y - yhat) ** 2) / np.sum((y - np.mean(y)) ** 2)
 
 
-# ---------- 일 단위 매칭 지표 ----------
+# ---------- Day-level matched metrics ----------
 daily = []
 for run, date in run_date.items():
     s = sim[(sim["run"] == run)]
@@ -114,16 +115,16 @@ lines = ["# Day-matched validation (2024 inputs)", "",
          daily.round(2).to_string(index=False), "",
          f"- pooled waiting KS = {pooled_ks.statistic:.3f} "
          f"(sim mean {sim_succ['waiting_time'].mean():.1f} / real {served['waiting_time'].mean():.1f})",
-         f"- daily failures vs 하한(배차 전 취소): R2 = {r2(daily['real_cancel_predisp'], daily['sim_failures']):.3f}, "
+         f"- daily failures vs lower bound (pre-dispatch cancellations): R2 = {r2(daily['real_cancel_predisp'], daily['sim_failures']):.3f}, "
          f"rho = {spearmanr(daily['real_cancel_predisp'], daily['sim_failures'])[0]:.3f}",
-         f"- daily failures vs 상한(30분 미배차): R2 = {r2(daily['real_nodisp30'], daily['sim_failures']):.3f}, "
+         f"- daily failures vs upper bound (no dispatch within 30 min): R2 = {r2(daily['real_nodisp30'], daily['sim_failures']):.3f}, "
          f"rho = {spearmanr(daily['real_nodisp30'], daily['sim_failures'])[0]:.3f}",
-         f"- hourly profile rho (run별 평균): 하한 {daily['rho_hourly_lo'].mean():.3f} / 상한 {daily['rho_hourly_hi'].mean():.3f}",
+         f"- hourly profile rho (mean over runs): lower {daily['rho_hourly_lo'].mean():.3f} / upper {daily['rho_hourly_hi'].mean():.3f}",
          f"- daily wait mean: sim {daily['sim_wait_mean'].mean():.1f} vs real {daily['real_wait_mean'].mean():.1f} "
-         f"(paired diff {(daily['sim_wait_mean'] - daily['real_wait_mean']).mean():+.1f}분)"]
+         f"(paired diff {(daily['sim_wait_mean'] - daily['real_wait_mean']).mean():+.1f} min)"]
 (OUT / f"daymatched_{args.scenario}_metrics.md").write_text("\n".join(lines), encoding="utf-8")
 
-# ---------- 그림 ----------
+# ---------- Figures ----------
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
 
@@ -154,4 +155,4 @@ ax.legend(fontsize=9); fig.tight_layout()
 fig.savefig(OUT / f"daymatched_{args.scenario}_waiting_hourly.png", dpi=200); plt.close(fig)
 
 print("\n".join(lines))
-print("\n저장:", OUT, "(daymatched_*)")
+print("\nSaved:", OUT, "(daymatched_*)")

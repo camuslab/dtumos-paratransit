@@ -1,16 +1,16 @@
-"""Empirical validation: baseline 시뮬레이션 vs 실측 (2023, 2024).
+"""Empirical validation: baseline simulation vs observed data (2023, 2024).
 
-정의를 맞춘 비교 (시뮬 규칙: 30분 내 미배차 = 실패, 대기 = 요청→승차):
-- 실패 대응치  (a) real_cancel_predisp : 배차 전 접수취소   (기존 논문 그림의 정의)
-               (b) real_nodisp30      : 배차까지 30분 초과 또는 미배차 (시뮬 규칙과 동일 정의)
-- 대기 대응치  30분 내 배차된 완료 운행의 (승차 - 예정/희망) — 시뮬이 서비스하는 모집단과 일치
+Definition-matched comparison (sim rules: no dispatch within 30 min = failure, waiting = request→pickup):
+- Failure counterparts  (a) real_cancel_predisp : pre-dispatch cancellations (definition used in the original paper figure)
+               (b) real_nodisp30      : dispatch beyond 30 min or never dispatched (same definition as the sim rule)
+- Waiting counterpart  (pickup - scheduled/desired time) of completed trips dispatched within 30 min — matches the population the sim serves
 
-비교 모집단: 각 연도 수요 상위 10일(서울 내 O/D, 예정/희망시각 기준), 06~24시.
-시뮬레이션: result/baseline 10-run (2025 입력 재현판, ETA ON — Gate A 통과 세대).
+Comparison population: top-10 demand days per year (Seoul-internal O/D, by scheduled/desired time), 06:00-24:00.
+Simulation: result/baseline 10-run (2025-input reproduction, ETA ON — the generation that passed Gate A).
 
-산출물 → {OUT}/  (README는 별도 작성)
+Outputs → {OUT}/  (README written separately)
 - tidy CSV: real_hourly_{yr}.csv, real_waiting_cond_{yr}.csv, sim_hourly.csv
-- metrics.md : KS, R², Spearman, 총량 비교
+- metrics.md : KS, R², Spearman, aggregate comparison
 - figures: fig_waiting_hourly_{yr}.png, fig_failure_scatter_{yr}.png
 """
 
@@ -34,17 +34,17 @@ SEOUL_GU = ['종로구','중구','용산구','성동구','광진구','동대문�
 
 
 def prep_real(year):
-    """연도별 실측: (일×시간대 집계, 조건부 대기시간 rows)"""
+    """Observed data per year: (day x hour aggregates, conditional waiting-time rows)"""
     if year == 2023:
         df = pd.read_parquet(PROJECT_ROOT / "data/raw_data_2023.parquet")
         df = df[df['출발지구'].isin(SEOUL_GU) & df['목적지구'].isin(SEOUL_GU) & df['예정일시'].notna()]
         want, disp, ride = df['예정일시'], df['배차일시'], df['승차일시']
     else:
-        df = pd.read_parquet(PROJECT_ROOT / "data/(서울시)특별교통수단/서울_2024_로우데이터.parquet")
+        df = pd.read_parquet(PROJECT_ROOT / "data/seoul_paratransit_raw/seoul_2024_raw.parquet")
         df = df[(df['접수일시'] >= '2024-05-01') & (df['접수일시'] < '2024-07-01')]
         df = df[(df['출발시'] == '서울특별시') & (df['목적시'] == '서울특별시') & df['희망일시'].notna()]
         want, disp, ride = df['희망일시'], df['배차시간'], df['탑승시간']
-        df = df.assign(취소일시=pd.NaT)  # 2024 원본은 탑승유무로 취소 식별
+        df = df.assign(취소일시=pd.NaT)  # 2024 raw data identifies cancellations via the boarding-status column
     df = df.assign(want=want, disp=disp, ride=ride)
     df['hour'] = df['want'].dt.hour
     df = df[df['hour'].isin(HOURS)]
@@ -170,4 +170,4 @@ for year in (2023, 2024):
 
 (OUT / "metrics.md").write_text("\n".join(lines), encoding="utf-8")
 print("\n".join(lines))
-print("저장 위치:", OUT)
+print("Saved to:", OUT)

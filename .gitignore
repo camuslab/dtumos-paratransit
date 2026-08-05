@@ -1,16 +1,32 @@
-visualization/simulation/node_modules/
-visualization/simulation/build/
-
+# OS / environment
 .DS_Store
 .env
 __pycache__/
 *.pyc
 
-# Large local archives / raw source data (not tracked)
-_시뮬레이션_정리_*
-data/(서울시)특별교통수단/
+# Local archives (never tracked)
+_simulation_archive_*
+*.7z
 
-# Large per-run simulation outputs (keep record.csv & summary files only)
-revision_runs_2026/**/trip.json
-revision_runs_2026/**/vehicle_marker.json
-revision_runs_2026/**/passenger_marker.json
+# Raw and derived mobility data — kept local only for privacy.
+# Only data/etc/ (public administrative boundaries, README image) is tracked.
+data/*
+!data/etc/
+result/
+cache/
+
+# Per-run simulation outputs and agent-level inputs (local only — privacy)
+revision_runs_2026/campaign/
+revision_runs_2026/campaign_fast/
+revision_runs_2026/passenger24/
+revision_runs_2026/fleet_files/
+revision_runs_2026/gate_base_eta/
+revision_runs_2026/jobs_resume.txt
+
+# Visualization: demo data and legacy dashboard copy (canonical dashboard
+# lives in the dtumos-paratransit-report repository)
+visualization/simulation/node_modules/
+visualization/simulation/build/
+visualization/simulation/public/data/
+visualization/simulation/src/data/
+visualization/dashboard/

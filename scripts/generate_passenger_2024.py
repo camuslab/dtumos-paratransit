@@ -1,16 +1,16 @@
-"""2024 원본(좌표 포함)으로 시뮬레이션용 passenger 데이터 생성.
+"""Generate simulation passenger data from the 2024 raw data (with coordinates).
 
-기존 data/simulation-agent-data/passenger/ (2023 기반)와 동일한 방식:
-- 수요 상위 10일(평일), 취소 건 포함한 전체 접수를 하루 단위 파일로 저장
-- ride_time = 희망일시의 자정 기준 경과 분 (기존 파일이 예정일시 분포와 상관 0.997)
-- 서울 출발 & 서울 도착 통행만 포함 (기존 파일 bbox가 서울 시내로 한정됨)
+Same approach as the existing data/simulation-agent-data/passenger/ (2023-based):
+- Top-10 demand days (weekdays); save all requests including cancellations, one file per day
+- ride_time = minutes since midnight of the desired time (existing files correlate 0.997 with the scheduled-time distribution)
+- Seoul-origin & Seoul-destination trips only (existing files' bbox is limited to Seoul)
 
-기존 방식 대비 개선점:
-- 좌표: 행정동 내 랜덤 생성 → 실제 승하차 좌표
-- type(휠체어): 랜덤 23/77 부여 → 실측 휠체어 컬럼 사용
+Improvements over the existing approach:
+- Coordinates: random points within admin dong → actual pickup/drop-off coordinates
+- type (wheelchair): random 23/77 assignment → observed wheelchair column
 
-출력: data/simulation-agent-data/passenger_2024/passenger_{0..9}.parquet
-      + days.csv (파일별 대상 날짜와 건수)
+Output: data/simulation-agent-data/passenger_2024/passenger_{0..9}.parquet
+        + days.csv (target date and count per file)
 """
 
 from pathlib import Path
@@ -18,27 +18,27 @@ from pathlib import Path
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SRC = PROJECT_ROOT / "data/(서울시)특별교통수단/서울_2024_로우데이터.parquet"
+SRC = PROJECT_ROOT / "data/seoul_paratransit_raw/seoul_2024_raw.parquet"
 OUT_DIR = PROJECT_ROOT / "data/simulation-agent-data/passenger_2024"
 N_DAYS = 10
 
 df = pd.read_parquet(SRC)
 df = df[(df["접수일시"] >= "2024-05-01") & (df["접수일시"] < "2024-07-01")]
-print(f"2024-05~06 전체 접수: {len(df):,}")
+print(f"All requests 2024-05~06: {len(df):,}")
 
 df = df[(df["출발시"] == "서울특별시") & (df["목적시"] == "서울특별시")]
-print(f"서울 내 O/D 필터 후: {len(df):,}")
+print(f"After Seoul-internal O/D filter: {len(df):,}")
 
 valid_coord = (
     df[["출발위도", "출발경도", "목적위도", "목적경도"]].notna().all(axis=1)
     & (df["출발위도"] > 37) & (df["목적위도"] > 37)
 )
 df = df[valid_coord & df["희망일시"].notna()]
-print(f"좌표/희망일시 유효 필터 후: {len(df):,}")
+print(f"After valid coordinate/desired-time filter: {len(df):,}")
 
 df["희망일자"] = df["희망일시"].dt.date
 top_days = df.groupby("희망일자").size().sort_values(ascending=False).head(N_DAYS)
-print("\n선정된 날짜 (희망일시 기준 수요 상위):")
+print("\nSelected dates (top demand by desired time):")
 print(top_days.to_string())
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,5 +68,5 @@ for i, (day, n) in enumerate(top_days.items()):
 
 meta = pd.DataFrame(meta)
 meta.to_csv(OUT_DIR / "days.csv", index=False)
-print(f"\n저장 완료: {OUT_DIR}")
+print(f"\nSaved: {OUT_DIR}")
 print(meta.to_string(index=False))

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""병렬 캠페인 런처: jobs 파일(한 줄에 'SCENARIO REALIZATION')을 읽어
-N개 동시 실행, OSRM 포트(5001/5002/5003) 라운드로빈 배정.
+"""Parallel campaign launcher: reads a jobs file (one 'SCENARIO REALIZATION' per line),
+runs N jobs concurrently, assigns OSRM ports (5001/5002/5003) round-robin.
 usage: launch_campaign.py --jobs jobs_phase1.txt --concurrency 6
 """
 import argparse, subprocess, os, sys, time
@@ -23,7 +23,7 @@ with open(args.jobs) as f:
             parts = ln.split()
             jobs.append((parts[0], int(parts[1]), parts[2:]))
 
-print(f"총 {len(jobs)}개 작업, 동시 {args.concurrency}개, 포트 {PORTS}")
+print(f"{len(jobs)} jobs total, {args.concurrency} concurrent, ports {PORTS}")
 t0 = time.time()
 
 def run(idx_job):
@@ -44,5 +44,5 @@ with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
     rcs = list(ex.map(run, enumerate(jobs)))
 
 fails = sum(1 for rc in rcs if rc != 0)
-print(f"완료: {len(jobs)-fails}/{len(jobs)} 성공, 총 {(time.time()-t0)/3600:.1f}시간")
+print(f"Done: {len(jobs)-fails}/{len(jobs)} succeeded, {(time.time()-t0)/3600:.1f} h total")
 sys.exit(1 if fails else 0)

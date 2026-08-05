@@ -1,14 +1,14 @@
-"""baseline 시뮬레이션 10-run에서 검증용 시뮬 데이터 추출.
+"""Extract simulation validation data from the baseline 10-run.
 
-result/baseline/simulation_{1..10}/passenger_marker.json 기준:
-- status 1 = 성공: timestamp = [요청시각, 승차시각] (분) → 대기시간 = end - start
-- status 0 = 실패: timestamp = [요청시각, 실패판정시각]
+From result/baseline/simulation_{1..10}/passenger_marker.json:
+- status 1 = success: timestamp = [request time, pickup time] (min) → waiting time = end - start
+- status 0 = failure: timestamp = [request time, failure-decision time]
 
-출력 (data/verification/):
-1. sim_baseline_waiting.csv : run, hour(요청시각 기준), waiting_time(분)
-2. sim_baseline_failure.csv : run x hour별 요청/실패 건수
-   - failure_hour_request : 요청시각 기준 실패 집계
-   - failure_hour_fail    : 실패판정시각 기준 집계 (기존 논문 그림 방식)
+Outputs (data/verification/):
+1. sim_baseline_waiting.csv : run, hour (by request time), waiting_time (min)
+2. sim_baseline_failure.csv : request/failure counts per run x hour
+   - failure_hour_request : failures counted by request time
+   - failure_hour_fail    : counted by failure-decision time (method of the original paper figure)
 """
 
 from pathlib import Path
@@ -58,7 +58,7 @@ counts.to_csv(OUT_DIR / "sim_baseline_failure.csv", index=False)
 fd = pd.concat(fail_durations)
 n_req = counts.groupby("run")["request_count"].sum()
 n_fail = counts.groupby("run")["failure_hour_request"].sum()
-print(f"runs: {counts['run'].nunique()}, 요청/런 평균 {n_req.mean():.0f}, 실패율 평균 {(n_fail/n_req).mean()*100:.2f}%")
-print(f"실패 판정까지 시간(분): min {fd.min():.1f} / median {fd.median():.1f} / max {fd.max():.1f}")
-print(f"성공 대기시간(분): mean {waiting['waiting_time'].mean():.1f} / median {waiting['waiting_time'].median():.1f}")
-print(f"저장: {OUT_DIR}/sim_baseline_waiting.csv, sim_baseline_failure.csv")
+print(f"runs: {counts['run'].nunique()}, avg requests/run {n_req.mean():.0f}, avg failure rate {(n_fail/n_req).mean()*100:.2f}%")
+print(f"Time to failure decision (min): min {fd.min():.1f} / median {fd.median():.1f} / max {fd.max():.1f}")
+print(f"Waiting time of served requests (min): mean {waiting['waiting_time'].mean():.1f} / median {waiting['waiting_time'].median():.1f}")
+print(f"Saved: {OUT_DIR}/sim_baseline_waiting.csv, sim_baseline_failure.csv")

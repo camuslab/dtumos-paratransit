@@ -4,8 +4,8 @@ import pandas as pd
 import geopandas as gpd
 import osmnx as ox
 
-# *조회가 안 될때, https://www.openstreetmap.org 기입하고 싶은 지역명을 먼저 확인하고 실행하세요. 
-# road_type : 1(고속도로), 2(간선도로), 3(집산도로)
+# *If the lookup fails, first check the desired place name on https://www.openstreetmap.org, then run.
+# road_type : 1 (highway), 2 (arterial road), 3 (collector road)
 class point_generator_with_OSM:
     def __init__(self):
         self.road_type = [2,3]

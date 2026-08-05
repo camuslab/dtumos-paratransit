@@ -33,7 +33,7 @@ def figure_6_7_N_8_9(base_path, place_geometry, mapboxKey, time_range, status='p
                                         right=False,
                                         bins = list(range(time_range[0], time_range[1]+1, 60)),
                                         labels = list(range(time_range[0], time_range[1], 60)))
-    total_trip_frames = [row for _,row in total_trips.groupby('time')] # 데이터 frame화
+    total_trip_frames = [row for _,row in total_trips.groupby('time')] # split data into frames
 
     ### Draw figure_6
     frames = [{

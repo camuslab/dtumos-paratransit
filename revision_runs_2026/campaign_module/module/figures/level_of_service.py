@@ -17,7 +17,7 @@ def figure_1(base_path, time_range, time_bins, time_single_labels, save_path = N
         passengers['time_cat'] = pd.cut(passengers['start_time'], bins=time_bins, labels=time_single_labels, right=False)
 
         failure_passengers = passengers.loc[(passengers['status'] == 0)].reset_index(drop=True)
-        failure_passengers['time_cat'] = pd.cut(failure_passengers['end_time'], bins=time_bins, labels=time_single_labels, right=False) # 실패 건수는 실패 시간을 기준
+        failure_passengers['time_cat'] = pd.cut(failure_passengers['end_time'], bins=time_bins, labels=time_single_labels, right=False) # failure counts are based on the failure time
         
         request_ps_cnt = pd.DataFrame(passengers['time_cat'].value_counts().sort_index()).reset_index()
         failure_ps_cnt = pd.DataFrame(failure_passengers['time_cat'].value_counts().sort_index()).reset_index()    
@@ -97,7 +97,7 @@ def figure_2(base_path, time_bins, time_single_labels, time_double_labels, save_
         
         ## request failure ratio
         failure_passengers = passengers.loc[(passengers['status'] == 0)].reset_index(drop=True)
-        failure_passengers['time_cat'] = pd.cut(failure_passengers['end_time'], bins=time_bins, labels=time_single_labels, right=False) # 실패 건수는 실패 시간을 기준
+        failure_passengers['time_cat'] = pd.cut(failure_passengers['end_time'], bins=time_bins, labels=time_single_labels, right=False) # failure counts are based on the failure time
         
         request_failure_ratio = pd.DataFrame(failure_passengers.value_counts('time_cat').sort_index() / passengers.value_counts('time_cat').sort_index()).reset_index()
         request_failure_ratio = request_failure_ratio.rename(columns={'count': "request_failure_ratio"})
@@ -115,16 +115,16 @@ def figure_2(base_path, time_bins, time_single_labels, time_double_labels, save_
     ### Draw figure
     fig_2 = go.Figure()
     # ── 1) traces ──
-    # (a) 실제 bar trace
+    # (a) actual bar trace
     fig_2.add_trace(go.Bar(
         x=time_double_labels,
         y=average_service_level_inf['request_count'].tolist(),
         name='Called Requests',
         marker=dict(color='grey'),
         opacity=0.5,
-        showlegend=False     # legend는 직접 그릴 거라 꺼둠
+        showlegend=False     # legend is drawn manually, so keep this off
     ))
-    # (b) 두 개의 line trace
+    # (b) two line traces
     for col, nm in [
         ('request_failure_ratio', 'Request Failure (%)'),
         ('service_failure_ratio', 'Service Failure (%)')
@@ -139,17 +139,17 @@ def figure_2(base_path, time_bins, time_single_labels, time_double_labels, save_
             opacity=0.8
         ))
 
-    # ── 2) “Called Requests” 회색 박스 + 텍스트 ──
-    # (a) 작은 회색 박스 그리기
+    # ── 2) "Called Requests" grey box + text ──
+    # (a) draw a small grey box
     fig_2.add_shape(
         type='rect',
         xref='paper', yref='paper',
-        x0=0.02, x1=0.05,    # 박스의 너비 조절
-        y0=0.93, y1=0.96,    # 박스의 높이 조절
+        x0=0.02, x1=0.05,    # adjust box width
+        y0=0.93, y1=0.96,    # adjust box height
         fillcolor='grey',
         line_width=0
     )
-    # (b) 그 옆에 텍스트
+    # (b) text next to it
     fig_2.add_annotation(
         xref='paper', yref='paper',
         x=0.055, y=0.945,
@@ -159,7 +159,7 @@ def figure_2(base_path, time_bins, time_single_labels, time_double_labels, save_
         font=dict(size=12, color='black')
     )
 
-    # ── 3) 레이아웃 ──
+    # ── 3) layout ──
     fig_2.update_layout(
         template='plotly_white',
         xaxis=dict(
@@ -213,7 +213,7 @@ def figure_3(base_path, time_range, time_bins, time_single_labels, save_path = N
     total_waiting_time_inf = pd.concat(total_waiting_time_inf).reset_index(drop=True)
     total_waiting_time_inf['time'] = [int(tm.split(':')[0])*60 for tm in total_waiting_time_inf['time_cat']]
 
-    # top5 평균 대기시간
+    # top 5% average waiting time
     top5pct_average_wt = {}
     for tm in time_single_labels:
         specific_waiting_time = total_waiting_time_inf.loc[(total_waiting_time_inf['time_cat'] == tm)].reset_index(drop=True)
@@ -225,10 +225,10 @@ def figure_3(base_path, time_range, time_bins, time_single_labels, save_path = N
 
 
     ### Draw figure
-    # 평균 대기시간 계산
+    # compute average waiting time
     mean_wait = round(np.mean(total_waiting_time_inf["waiting_time"]))
 
-    # 4:1 비율의 1행 2열 서브플롯 생성
+    # create 1x2 subplots with a 4:1 width ratio
     fig_3 = make_subplots(
         rows=1, cols=2,
         column_widths=[0.8, 0.2],
@@ -238,7 +238,7 @@ def figure_3(base_path, time_range, time_bins, time_single_labels, save_path = N
         )
     )
 
-    # ── 왼쪽: 시간대별 Box + Top 5% 선 ──
+    # ── left: hourly Box + Top 5% line ──
     fig_3.add_trace(
         go.Box(
             x=total_waiting_time_inf["time"],
@@ -261,7 +261,7 @@ def figure_3(base_path, time_range, time_bins, time_single_labels, save_path = N
         row=1, col=1
     )
 
-    # ── 오른쪽: 전체 기간 분포 Box ──
+    # ── right: full-period distribution Box ──
     fig_3.add_trace(
         go.Box(
             y=total_waiting_time_inf["waiting_time"],
@@ -272,7 +272,7 @@ def figure_3(base_path, time_range, time_bins, time_single_labels, save_path = N
         row=1, col=2
     )
 
-    # ── 레이아웃 및 축 설정 ──
+    # ── layout and axis settings ──
     fig_3.update_xaxes(
         dict(
             tickmode="array",

@@ -17,7 +17,7 @@ def cost_matrix_data_prepare(passenger, vehicle, simul_configs):
 
     return passenger, vehicle
 
-### metro일때랑 seuol일때랑 eta 모델의 input data가 다름
+### The ETA model input data differs between metro and seoul
 def eta_cost_matrix(active_passenger, empty_vehicle, time, simul_configs):
     
     # if simul_configs['dispatch_mode'] == 'in_order':
@@ -101,16 +101,16 @@ def dispatch_cost_matrix(active_passenger, empty_vehicle, time, simul_configs):
     
     active_passenger, empty_vehicle = cost_matrix_data_prepare(active_passenger, empty_vehicle, simul_configs)
 
-    # (optimization은 수가 큰 것을 항상 처음에 넣어 준다)
+    # (optimization always puts the larger set first)
     if dispatch_mode == 'optimization':
-        # 직선 길이
+        # straight-line distance
         if matrix_mode == 'haversine_distance':    
             if len(active_passenger) >= len(empty_vehicle):
                 cost_matrix = haversine_distance_cost_matrix(active_passenger, empty_vehicle)
             else:
                 cost_matrix = haversine_distance_cost_matrix(empty_vehicle, active_passenger)
         
-        # 도로 길이
+        # road distance
         elif matrix_mode == 'street_distance':
             if len(active_passenger) >= len(empty_vehicle):
                 costs = np.array([[a + b for b in  empty_vehicle] for a in active_passenger])
@@ -134,17 +134,17 @@ def dispatch_cost_matrix(active_passenger, empty_vehicle, time, simul_configs):
         else:
             assert False, 'matrix_mode is not defined'
         
-    ### 데이터 순서대로
+    ### In data order
     elif dispatch_mode in ('in_order', 'batched_greedy'):
-        # 직선 길이
+        # straight-line distance
         if matrix_mode == 'haversine_distance': 
             active_passenger = active_passenger[0] 
             costs = np.array([active_passenger +  vehicle for vehicle in empty_vehicle])
             cost_matrix = calculate_straight_distance(costs[:,0], costs[:,1], costs[:,2], costs[:,3])
             
-        # 도로 길이
-        elif matrix_mode == 'street_distance': 
-            active_passenger = active_passenger[0] 
+        # road distance
+        elif matrix_mode == 'street_distance':
+            active_passenger = active_passenger[0]
             costs = [active_passenger + vehicle for vehicle in empty_vehicle]
             if len(costs) >= 60:
                 p = Pool(processes=30)

@@ -129,7 +129,7 @@ def base_data():
     return active_vehicle, empty_vehicle, requested_passenger, fail_passenger, simulation_record
 
 
-### 시뮬레이션 시작 전 데이터 전처리
+### Data preprocessing before the simulation starts
 def seoul_passenger_preprocessing(passengers):
     passengers = passengers[['ID', 'ride_time', 'ride_lat', 'ride_lon', 'alight_lat', 'alight_lon', 'dispatch_time', 'type']]
     return passengers
@@ -150,8 +150,8 @@ def get_preprocessed_seoul_data(passengers, vehicles):
 base_configs = {'target_region': '서울 대한민국',
                   'problem': 'disabledCalltaxi',
                   'relocation_region': 'seoul',
-                  'path': None, # simul_result에 원하는 path 그 자리에 생김
-                  'additional_path':None, # simul_result에 이 자리위에 생김
+                  'path': None, # created under simul_result at the given path
+                  'additional_path':None, # created under simul_result above that path
                   'time_range':[360, 1440],
                   'fail_time': 30,
                   'add_board_time': 10,
@@ -163,7 +163,7 @@ base_configs = {'target_region': '서울 대한민국',
 
 
 
-### simulation "result.json" 만드는 코드
+### code that generates the simulation "result.json"
 import os
 import pandas as pd
 import numpy as np

@@ -32,13 +32,13 @@ def get_res(point):
    overview = '?overview=full'
    loc = f"{point[1]},{point[0]};{point[3]},{point[2]}" # lon, lat, lon, lat
    url = "http://127.0.0.1:" + _os.environ.get("OSRM_PORT", "5001") + "/route/v1/driving/"
-   # url = 'http://router.project-osrm.org/route/v1/driving' # OSRM docker 없을때 사용
+   # url = 'http://router.project-osrm.org/route/v1/driving' # use when the OSRM docker is unavailable
    r = session.get(url + loc + overview, timeout=60) 
    
    if r.status_code!= 200:
       
-      # 400 = NoRoute/NoSegment (결정론적, 미세구간 스냅 문제) → fallback 사용
-      # 그 외 = 일시적 오류 → 호출측에서 재시도
+      # 400 = NoRoute/NoSegment (deterministic, micro-segment snapping issue) → use fallback
+      # otherwise = transient error → caller retries
       status = 'noroute' if r.status_code == 400 else 'undefined'
       
       # distance    
@@ -114,7 +114,7 @@ _atexit.register(_dump_prof)
 
 def osrm_routing_machine(OD_coords):
    # O_lat, O_lon, D_lat, D_lon = OD_coords
-   # 일시적 비-200/연결오류는 재시도 (성공 결과는 기존과 동일 → 비의미적 하드닝)
+   # retry transient non-200/connection errors (successful results unchanged → non-semantic hardening)
    _pt0 = _rt_time.perf_counter()
    for _attempt in range(6):
       try:
@@ -126,7 +126,7 @@ def osrm_routing_machine(OD_coords):
       if status == 'noroute':
          import sys as _sys
          print(f"NOROUTE fallback: {OD_coords}", file=_sys.stderr)
-         return osrm_base  # get_res가 만든 직선 보간 결과 (기존 엔진의 fallback 의도 복원)
+         return osrm_base  # straight-line interpolation result from get_res (restores the original engine's fallback intent)
       _rt_time.sleep(0.3 * (_attempt + 1))
    else:
       raise RuntimeError(f"OSRM unreachable after retries: {OD_coords}")

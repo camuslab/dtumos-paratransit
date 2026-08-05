@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""캠페인 시나리오 러너 v2: 논문판 입력 + ETA ON.
-scenario 코드:
-  base/B/C/D/E/BC/BD/CD  — 2^3 조합 (B=optimization, C=전일가동, D=휠체어만)
-  greedy                 — batched nearest-greedy 디스패치 (대기시간 내림차순)
-  F<n>                   — fleet 그리드 (n대; fleet_files/vehicle_<n>.csv)
-  Clite<h>               — work_end<=h 차량을 h~24시로 재배치 (naive)
-  Cbudget                — Base 총 driver-hours 보존, 시작시각만 수요형 재배치
+"""Campaign scenario runner v2: paper-version inputs + ETA ON.
+scenario codes:
+  base/B/C/D/E/BC/BD/CD  — 2^3 combinations (B=optimization, C=all-day operation, D=wheelchair-only)
+  greedy                 — batched nearest-greedy dispatch (waiting time descending)
+  F<n>                   — fleet grid (n vehicles; fleet_files/vehicle_<n>.csv)
+  Clite<h>               — reassign vehicles with work_end<=h to h~24h (naive)
+  Cbudget                — preserve Base total driver-hours, demand-shaped reassignment of start times only
 """
 import os, sys, time, argparse, json, fcntl
 import multiprocess
@@ -24,10 +24,10 @@ ap.add_argument("--fail_time", type=int, default=30)
 ap.add_argument("--dwell", type=int, default=10)
 ap.add_argument("--supply", type=float, default=1.0)
 ap.add_argument("--demand", default="1.0")  # 0.9 / 1.1 / 1.2 / surge / od
-ap.add_argument("--uptake", type=float, default=1.0)   # D 바우처 수용률
+ap.add_argument("--uptake", type=float, default=1.0)   # D voucher uptake rate
 ap.add_argument("--dwell_sigma", type=float, default=0.0)
 ap.add_argument("--year", type=int, default=2023)
-ap.add_argument("--fleet_year", type=int, default=0)  # 0 = year와 동일; 2x2 분해용
+ap.add_argument("--fleet_year", type=int, default=0)  # 0 = same as year; for the 2x2 decomposition
 ap.add_argument("--timing", action="store_true")
 args = ap.parse_args()
 scen = args.scenario
@@ -39,7 +39,7 @@ import joblib
 from module.simulator import Simulator
 from module.simulator_helper import get_preprocessed_seoul_data, base_configs
 
-ARCH = "/Users/jihoyeo/research/dtumos-paratransit/_시뮬레이션_정리_20260730"
+ARCH = "/Users/jihoyeo/research/dtumos-paratransit/_simulation_archive_20260730"
 if args.year == 2024:
     passengers = pd.read_csv(f"{HERE}/passenger24/passenger24_{i}.csv")
 else:
@@ -49,11 +49,11 @@ if args.demand != "1.0":
     donor_path = (f"{HERE}/passenger24/passenger24_{(i+1) % 10}.csv" if args.year == 2024
                   else f"{ARCH}/05_demand_generator/passenger_output_2025_paper/passenger_{(i+1) % 10}.csv")
     donor = pd.read_csv(donor_path)
-    if args.demand == "od":  # 관측 일별총량 부트스트랩 (공휴일 제외 factors)
+    if args.demand == "od":  # bootstrap of observed daily totals (factors exclude holidays)
         _factors = json.load(open(f"{HERE}/od_factors.json"))
         _od_mode = True
         args.demand = str(_factors[i % len(_factors)])
-    if args.demand == "surge":  # 14~15시 수요 ×1.5
+    if args.demand == "surge":  # 14-15h demand ×1.5
         pool = donor[(donor.ride_time >= 840) & (donor.ride_time < 900)]
         extra = pool.sample(frac=0.5, random_state=3000 + i)
     else:
@@ -61,7 +61,7 @@ if args.demand != "1.0":
         if f < 1.0:  # thinning
             passengers = passengers.sample(frac=f, random_state=2000 + i)
             extra = passengers.iloc[0:0]
-        else:  # 독립 realization 중첩 (Poisson 합성)
+        else:  # overlay an independent realization (Poisson superposition)
             extra = donor.sample(frac=f - 1.0, random_state=3000 + i)
     if len(extra):
         extra = extra.copy()
@@ -73,7 +73,7 @@ COMBO = {"base": (0,0,0), "B": (1,0,0), "C": (0,1,0), "D": (0,0,1),
          "BC": (1,1,0), "BD": (1,0,1), "CD": (0,1,1), "E": (1,1,1)}
 use_B, use_C, use_D = COMBO.get(scen, (0,0,0))
 
-# C-targeted 조합 코드: [B]Ct<K>[D]  (예: BCt100, Ct100D, BCt100D)
+# C-targeted combination codes: [B]Ct<K>[D]  (e.g. BCt100, Ct100D, BCt100D)
 import re
 _m_ct = re.fullmatch(r"(B?)Ct(\d+)(D?)", scen)
 K_ct = None
@@ -111,12 +111,13 @@ if scen.startswith("Clite"):
     mask = vehicles["work_end"] <= start_h
     vehicles.loc[mask, "work_start"] = start_h
     vehicles.loc[mask, "work_end"] = 24
-    print(f"Clite{start_h}: {mask.sum()}대 재배치")
+    print(f"Clite{start_h}: {mask.sum()} vehicles reassigned")
 
 if K_ct is not None:
-    # C-targeted: 관측 병목창(07–16시; 아침 7시 + 오후 14–16시 failure 피크 커버)에
-    # 9시간 추가 시프트 K개 투입. 자기 시프트가 07–16시와 겹치지 않는 차량(유휴)에
-    # 우선 배정하고, 초과분은 예비차량 필요로 명시. 추가 driver-hours = K×9.
+    # C-targeted: add K extra 9-hour shifts in the observed bottleneck window
+    # (07–16h; covers the 7 am and 14–16h failure peaks). Assign first to vehicles
+    # whose own shift does not overlap 07–16h (idle); the excess is flagged as
+    # requiring reserve vehicles. Added driver-hours = K×9.
     K = K_ct
     ws0, we0 = vehicles["work_start"], vehicles["work_end"]
     we_adj = we0.where(we0 > ws0, we0 + 24)
@@ -131,11 +132,11 @@ if K_ct is not None:
     add["work_start"] = 7
     add["work_end"] = 16
     vehicles = pd.concat([vehicles, add], ignore_index=True)
-    print(f"Ct{K}: 추가시프트 {K}개(07-16시), 유휴차량 {len(take1)}대 / 예비차량 필요 {rest}대, +{K*9} veh-h")
+    print(f"Ct{K}: {K} extra shifts (07-16h), {len(take1)} idle vehicles / {rest} reserve vehicles needed, +{K*9} veh-h")
 
 if scen == "Cbudget":
-    # Scenario C의 시간대별 실운행 프로파일(10런 평균)을 목표로, 각 차량의 근무시간 길이는
-    # 보존한 채 시작시각만 재배치 (총 driver-hours 예산 중립; 결정론적 greedy fill)
+    # Target Scenario C's hourly on-duty profile (10-run mean); keep each vehicle's
+    # shift length and reassign only the start time (total driver-hours budget-neutral; deterministic greedy fill)
     TGT = {6:56, 7:432, 8:515, 9:273, 10:306, 11:376, 12:480, 13:390,
            14:572, 15:612, 16:502, 17:244, 18:111, 19:83, 20:74, 21:48, 22:22, 23:12}
     ws = vehicles["work_start"].clip(lower=6)
@@ -155,7 +156,7 @@ if scen == "Cbudget":
             planned[h] += 1
         vehicles.loc[idx, "work_start"] = best_s
         vehicles.loc[idx, "work_end"] = min(best_s + int(dur[idx]), 24)
-    print(f"Cbudget: 총 {int(dur.sum())} veh-h 보존 재배치 (Base 창내 총량과 동일)")
+    print(f"Cbudget: reassigned preserving {int(dur.sum())} veh-h total (same in-window total as Base)")
 
 if args.supply < 1.0:
     vehicles = vehicles.sample(frac=args.supply, random_state=1000 + i).reset_index(drop=True)
@@ -188,7 +189,7 @@ simul_configs["dispatch_mode"] = dispatch_mode
 simul_configs["matrix_mode"] = "ETA"
 simul_configs["eta_model"] = eta_model
 
-print(f"[{scen} r{i}] 승객 {len(passengers)}, 차량 {len(vehicles)}, dispatch={dispatch_mode}, OSRM_PORT={os.environ.get('OSRM_PORT','5001')}", flush=True)
+print(f"[{scen} r{i}] passengers {len(passengers)}, vehicles {len(vehicles)}, dispatch={dispatch_mode}, OSRM_PORT={os.environ.get('OSRM_PORT','5001')}", flush=True)
 if args.timing:
     os.environ["TIMING_FILE"] = os.path.join(HERE, f"solve_times_{label}_r{i}.csv")
 t0 = time.time()

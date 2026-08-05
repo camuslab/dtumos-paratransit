@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
-"""TR_A 리비전용 그림 생성 (2026-08).
+"""Figure generation for the TR_A revision (2026-08).
 
-원고 그림 서식은 dtumos-paratransit-report/make_paper_figure.ipynb 규약을 따른다:
-Times New Roman serif, seaborn whitegrid, paper context(font_scale=1.3), despine.
+Manuscript figure styling follows the dtumos-paratransit-report/make_paper_figure.ipynb conventions:
+Times New Roman serif, seaborn whitegrid, paper context (font_scale=1.3), despine.
 
-산출물 → OneDrive revision/drafts/figures/
-  fig_validation_failure_hourly   신규 (검증 3.X.2) 시간대별 실패: 시뮬 vs 실측 상·하한, 2023/2024
-  fig_validation_waiting_hourly   신규 (검증 3.X.3) 시간대별 조건부 대기: 시뮬 vs 실측, 2023/2024
-  fig_fleet_grid                  기존 Fig 11 교체 (4.2) fleet 그리드 + 공식 증차안 + targeted staffing 기준선
-  fig_matched_staffing_hourly     기존 Fig 12 교체 (4.2) Base/A-782/Ct156 시간대별 실패율
-  fig_factorial_waterfall         신규 (4.4) factorial waterfall + 평균 한계기여
-  fig_supply_2023_2024            신규 (4.7) 2023 vs 2024 시간대별 근무 차량
-  fig_cancellations_by_hour       신규 (부록, R2-7) 시간대별 취소 건수(배차 전/후), 6월 평일
+Outputs → OneDrive revision/drafts/figures/
+  fig_validation_failure_hourly   new (validation 3.X.2) hourly failures: sim vs observed upper/lower bounds, 2023/2024
+  fig_validation_waiting_hourly   new (validation 3.X.3) hourly conditional waiting: sim vs observed, 2023/2024
+  fig_fleet_grid                  replaces old Fig 11 (4.2) fleet grid + official expansion targets + targeted staffing baselines
+  fig_matched_staffing_hourly     replaces old Fig 12 (4.2) Base/A-782/Ct156 hourly failure rates
+  fig_factorial_waterfall         new (4.4) factorial waterfall + mean marginal contributions
+  fig_supply_2023_2024            new (4.7) vehicles on duty by hour, 2023 vs 2024
+  fig_cancellations_by_hour       new (appendix, R2-7) hourly cancellations (pre-/post-dispatch), June weekdays
 
-데이터 출처
-  - campaign 10런 KPI: revision_runs_2026/campaign_fast_results.csv
-  - 2025 시나리오 10런 KPI: revision_runs_2026/stability_table_2025scenarios.csv
-  - run-level passenger_marker: result/baseline, _시뮬레이션_정리_20260730/04_verification_data
+Data sources
+  - campaign 10-run KPI: revision_runs_2026/campaign_fast_results.csv
+  - 2025-scenario 10-run KPI: revision_runs_2026/stability_table_2025scenarios.csv
+  - run-level passenger_marker: result/baseline, _simulation_archive_20260730/04_verification_data
     /verification_data_2025_paper/Scenario_A-1, revision_runs_2026/campaign_fast/simul_result/Ct156_r*
-  - 검증 tidy CSV: OneDrive revision/analysis/10_empirical_validation/
+  - validation tidy CSV: OneDrive revision/analysis/10_empirical_validation/
   - fleet: 02_vehicle_inputs/paper_2025__613_782_870/Baseline_613__vehicle_0.csv,
     revision_runs_2026/fleet_files/vehicle24_636.csv
-  - 취소: data/(서울시)특별교통수단/ 원자료 parquet (6월 평일, 공휴일 6/6 제외)
+  - cancellations: data/seoul_paratransit_raw/ raw parquet (June weekdays, excluding the 6/6 holiday)
 """
 
 import json
@@ -38,7 +38,7 @@ from scipy import stats as sps
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REV = PROJECT_ROOT / "revision_runs_2026"
-ARCH = PROJECT_ROOT / "_시뮬레이션_정리_20260730"
+ARCH = PROJECT_ROOT / "_simulation_archive_20260730"
 VAL = Path("/Users/jihoyeo/Library/CloudStorage/OneDrive-개인/research/장애인콜택시/paper/TR_A/revision/analysis/10_empirical_validation")
 OUT = Path("/Users/jihoyeo/Library/CloudStorage/OneDrive-개인/research/장애인콜택시/paper/TR_A/revision/drafts/figures")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -76,7 +76,7 @@ def ci95(x):
 
 
 # ----------------------------------------------------------------------------
-# 공통 데이터
+# Shared data
 # ----------------------------------------------------------------------------
 camp = pd.read_csv(REV / "campaign_fast_results.csv")
 stab = pd.read_csv(REV / "stability_table_2025scenarios.csv")
@@ -90,7 +90,7 @@ def camp_fail(scen):
 
 
 def hourly_failure_rate(run_dirs):
-    """passenger_marker.json 10런에서 요청시각 기준 시간대별 실패율(%) (pooled)."""
+    """Hourly failure rate (%) by request time from 10 passenger_marker.json runs (pooled)."""
     fail = np.zeros(len(HOURS))
     tot = np.zeros(len(HOURS))
     for d in run_dirs:
@@ -104,7 +104,58 @@ def hourly_failure_rate(run_dirs):
 
 
 # ============================================================================
-# 1. 검증: 시간대별 실패 — 시뮬 vs 실측 상·하한 (2023/2024)
+# 0. Figure 9 redesign: hourly requests (bars) + failure/delay rates (lines), left/right ticks aligned
+# ============================================================================
+def fig_hourly_requests_rates():
+    base_runs = [PROJECT_ROOT / "result" / "baseline" / f"simulation_{i}" for i in range(1, 11)]
+    fail = np.zeros(len(HOURS)); tot = np.zeros(len(HOURS))
+    served = np.zeros(len(HOURS)); delayed = np.zeros(len(HOURS))
+    req_per_run = np.zeros((len(base_runs), len(HOURS)))
+    for k, d in enumerate(base_runs):
+        pm = pd.read_json(Path(d) / "passenger_marker.json")
+        req_hour = pm["timestamp"].str[0].floordiv(60).astype(int).clip(6, 23)
+        wait = pm["timestamp"].str[1] - pm["timestamp"].str[0]
+        for j, h in enumerate(HOURS):
+            m = req_hour == h
+            tot[j] += m.sum(); req_per_run[k, j] = m.sum()
+            f = m & (pm["status"] == 0); fail[j] += f.sum()
+            s = m & (pm["status"] == 1); served[j] += s.sum()
+            delayed[j] += (s & (wait > 30)).sum()
+    req_mean = req_per_run.mean(axis=0)
+    fail_pct = np.where(tot > 0, fail / tot * 100, 0.0)
+    delay_pct = np.where(served > 0, delayed / served * 100, 0.0)
+    STATS["fig_hourly_requests_rates"] = {
+        "peak_hour_requests": {str(h): round(v, 1) for h, v in zip(HOURS, req_mean)},
+        "combined_share_of_requests_14h_pct": round(float((fail[8] + delayed[8]) / tot[8] * 100), 2),
+        "combined_share_of_requests_07h_pct": round(float((fail[1] + delayed[1]) / tot[1] * 100), 2),
+    }
+
+    x = np.arange(len(HOURS))
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+    bars = ax1.bar(x, req_mean, color="grey", alpha=0.5, label="Service Requests")
+    ax1.set_xlabel("Time of day")
+    ax1.set_ylabel("Number of service requests")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(HOUR_LABELS, rotation=45, ha="right")
+    # Left 0–1000/200, right 0–100/20: ratio fixed at exactly 10x → gridlines match the ticks on both axes
+    ax1.set_ylim(-40, 1040); ax1.set_yticks(np.arange(0, 1001, 200))
+
+    ax2 = ax1.twinx()
+    lf, = ax2.plot(x, fail_pct, marker="o", linestyle="-", color=NAVY,
+                   linewidth=2, markersize=5, label="Request Failure Rate")
+    ld, = ax2.plot(x, delay_pct, marker="s", linestyle="-", color=ORANGE,
+                   linewidth=2, markersize=5, label="Service Delay Rate")
+    ax2.set_ylabel("Rate (%)")
+    ax2.set_ylim(-4, 104); ax2.set_yticks(np.arange(0, 101, 20))
+    ax2.grid(False)
+
+    ax1.legend([bars, lf, ld], ["Service Requests", "Request Failure Rate", "Service Delay Rate"],
+               loc="upper right", frameon=True, framealpha=1.0, edgecolor="0.8")
+    save(fig, "fig_hourly_requests_rates")
+
+
+# ============================================================================
+# 1. Validation: hourly failures — sim vs observed upper/lower bounds (2023/2024)
 # ============================================================================
 def fig_validation_failure_hourly():
     sim = pd.read_csv(VAL / "sim_hourly.csv").set_index("hour").reindex(HOURS)
@@ -144,7 +195,7 @@ def fig_validation_failure_hourly():
 
 
 # ============================================================================
-# 2. 검증: 시간대별 조건부 대기 — 시뮬 vs 실측 (2023/2024)
+# 2. Validation: hourly conditional waiting — sim vs observed (2023/2024)
 # ============================================================================
 def fig_validation_waiting_hourly():
     sim_w = pd.read_csv(PROJECT_ROOT / "data/verification/sim_baseline_waiting.csv")
@@ -178,7 +229,7 @@ def fig_validation_waiting_hourly():
 
 
 # ============================================================================
-# 3. Fleet 그리드 + targeted staffing 기준선 (기존 Fig 11 교체)
+# 3. Fleet grid + targeted staffing baselines (replaces old Fig 11)
 # ============================================================================
 def fig_fleet_grid():
     grid_sizes = [644, 674, 705, 736, 766, 797]
@@ -223,7 +274,7 @@ def ci95_from_sd(sd, n):
 
 
 # ============================================================================
-# 4. Base vs A-782 vs Ct156 시간대별 실패율 (기존 Fig 12 교체)
+# 4. Base vs A-782 vs Ct156 hourly failure rates (replaces old Fig 12)
 # ============================================================================
 def fig_matched_staffing_hourly():
     base_dirs = [PROJECT_ROOT / f"result/baseline/simulation_{i}" for i in range(1, 11)]
@@ -258,7 +309,7 @@ def fig_matched_staffing_hourly():
 
 
 # ============================================================================
-# 5. Factorial waterfall (신규, 4.4)
+# 5. Factorial waterfall (new, 4.4)
 # ============================================================================
 def fig_factorial_waterfall():
     corners = {
@@ -326,7 +377,7 @@ def fig_factorial_waterfall():
 
 
 # ============================================================================
-# 6. 2023 vs 2024 시간대별 근무 차량 (신규, 4.7)
+# 6. Vehicles on duty by hour, 2023 vs 2024 (new, 4.7)
 # ============================================================================
 def fig_supply_2023_2024():
     v23 = pd.read_csv(ARCH / "02_vehicle_inputs/paper_2025__613_782_870/Baseline_613__vehicle_0.csv")
@@ -353,12 +404,12 @@ def fig_supply_2023_2024():
 
 
 # ============================================================================
-# 7. 부록: 시간대별 취소 건수 (배차 전/후), 6월 평일 (R2-7)
+# 7. Appendix: hourly cancellations (pre-/post-dispatch), June weekdays (R2-7)
 # ============================================================================
 def fig_cancellations_by_hour():
     cols = ["탑승유무", "희망일시", "배차시간", "출발시", "목적시"]
-    src23 = PROJECT_ROOT / "data/(서울시)특별교통수단/(서울시)2023년도1-6_로우데이터.parquet"
-    src24 = PROJECT_ROOT / "data/(서울시)특별교통수단/서울_2024_로우데이터.parquet"
+    src23 = PROJECT_ROOT / "data/seoul_paratransit_raw/seoul_2023_h1_raw.parquet"
+    src24 = PROJECT_ROOT / "data/seoul_paratransit_raw/seoul_2024_raw.parquet"
 
     def june_weekday_cancels(src, year):
         df = pd.read_parquet(src, columns=cols)
@@ -367,7 +418,7 @@ def fig_cancellations_by_hour():
         df = df[df["희망일시"].notna()]
         df = df[(df["희망일시"].dt.year == year) & (df["희망일시"].dt.month == 6)]
         df = df[df["희망일시"].dt.weekday < 5]
-        df = df[df["희망일시"].dt.day != 6]  # 현충일
+        df = df[df["희망일시"].dt.day != 6]  # Memorial Day holiday
         n_days = df["희망일시"].dt.date.nunique()
         c = df[df["탑승유무"] == "접수취소"].copy()
         c["hour"] = df["희망일시"].dt.hour
@@ -403,6 +454,7 @@ def fig_cancellations_by_hour():
 
 
 if __name__ == "__main__":
+    fig_hourly_requests_rates()
     fig_validation_failure_hourly()
     fig_validation_waiting_hourly()
     fig_fleet_grid()

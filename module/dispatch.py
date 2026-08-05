@@ -43,10 +43,10 @@ def ortools_dispatch(active_passenger, empty_vehicle, cost_matrix):
     for j in range(B_cnt):
         solver.Add(solver.Sum([x[i, j] for i in range(A_cnt)]) == 1)
     
-    # ### 일정거리 이상인 경우 매칭 제외
+    # ### Exclude matches beyond a certain distance
     # for i in range(A_cnt):
     #     for j in range(B_cnt):
-    #         if cost_matrix[i][j] >= 10: # 10km 이하인 경우만 매칭
+    #         if cost_matrix[i][j] >= 10: # match only when within 10km
     #             solver.Add(x[i, j] <= 0)
 
     #Create the objective function

@@ -51,7 +51,7 @@ import atexit
 _json_buffers = {}
 
 def save_json_data(current_data, save_path, file_name):
-    # 출력 동일 버퍼링: 매 호출마다 파일 전체를 재작성하는 대신 메모리에 누적, flush 시 1회 기록
+    # output-identical buffering: accumulate in memory instead of rewriting the whole file on every call, write once at flush
     key = f'{save_path}/{file_name}.json'
     if key not in _json_buffers:
         if os.path.isfile(key):
@@ -128,7 +128,7 @@ def base_data():
     return active_vehicle, empty_vehicle, requested_passenger, fail_passenger, simulation_record
 
 
-### 시뮬레이션 시작 전 데이터 전처리
+### Data preprocessing before the simulation starts
 def seoul_passenger_preprocessing(passengers):
     passengers = passengers[['ID', 'ride_time', 'ride_lat', 'ride_lon', 'alight_lat', 'alight_lon', 'dispatch_time', 'type']]
     return passengers
@@ -149,8 +149,8 @@ def get_preprocessed_seoul_data(passengers, vehicles):
 base_configs = {'target_region': '서울 대한민국',
                   'problem': 'disabledCalltaxi',
                   'relocation_region': 'seoul',
-                  'path': None, # simul_result에 원하는 path 그 자리에 생김
-                  'additional_path':None, # simul_result에 이 자리위에 생김
+                  'path': None, # created in simul_result at the given path
+                  'additional_path':None, # created in simul_result above this location
                   'time_range':[360, 1440],
                   'fail_time': 30,
                   'add_board_time': 10,
@@ -162,7 +162,7 @@ base_configs = {'target_region': '서울 대한민국',
 
 
 
-### simulation "result.json" 만드는 코드
+### Code that builds the simulation "result.json"
 import os
 import pandas as pd
 import numpy as np

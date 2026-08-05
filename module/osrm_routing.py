@@ -26,7 +26,7 @@ def get_res(point):
    overview = '?overview=full'
    loc = f"{point[1]},{point[0]};{point[3]},{point[2]}" # lon, lat, lon, lat
    url = "http://127.0.0.1:5000/route/v1/driving/"
-   # url = 'http://router.project-osrm.org/route/v1/driving' # OSRM docker 없을때 사용
+   # url = 'http://router.project-osrm.org/route/v1/driving' # use when the OSRM docker is unavailable
    r = session.get(url + loc + overview) 
    
    if r.status_code!= 200:
