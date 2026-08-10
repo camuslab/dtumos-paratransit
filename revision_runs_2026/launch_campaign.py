@@ -7,7 +7,7 @@ import argparse, subprocess, os, sys, time
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PY = os.path.join(HERE, "..", "venv312", "bin", "python")
+PY = os.environ.get("CAMPAIGN_PY", "/Users/jihoyeo/miniconda3/bin/python3.12")
 PORTS = ["5001", "5002", "5003"]
 
 ap = argparse.ArgumentParser()

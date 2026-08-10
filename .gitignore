@@ -30,3 +30,11 @@ visualization/simulation/build/
 visualization/simulation/public/data/
 visualization/simulation/src/data/
 visualization/dashboard/
+
+# Scenario-C campaign (2026-08): per-run outputs, logs, and agent-level schedules
+revision_runs_2026/simul_result/
+revision_runs_2026/logs/
+revision_runs_2026/*.log
+revision_runs_2026/module
+revision_runs_2026/schedule_opt/sched_*.csv
+revision_runs_2026/schedule_opt/make_figs_embed.py

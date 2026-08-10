@@ -28,6 +28,7 @@ ap.add_argument("--uptake", type=float, default=1.0)   # D voucher uptake rate
 ap.add_argument("--dwell_sigma", type=float, default=0.0)
 ap.add_argument("--year", type=int, default=2023)
 ap.add_argument("--fleet_year", type=int, default=0)  # 0 = same as year; for the 2x2 decomposition
+ap.add_argument("--sched_file", default="")  # schedule_opt CSV for Cs codes ([B]Cs[D])
 ap.add_argument("--timing", action="store_true")
 args = ap.parse_args()
 scen = args.scenario
@@ -81,6 +82,13 @@ if _m_ct:
     use_B = bool(_m_ct.group(1))
     K_ct = int(_m_ct.group(2))
     use_D = bool(_m_ct.group(3))
+
+# Cs codes: optimized schedule from schedule_opt/ ([B]Cs[D], vehicles from --sched_file)
+_m_cs = re.fullmatch(r"(B?)Cs(D?)", scen)
+if _m_cs:
+    use_B = bool(_m_cs.group(1))
+    use_D = bool(_m_cs.group(2))
+    assert args.sched_file, "Cs scenario requires --sched_file"
 
 dispatch_mode = "optimization" if use_B else "in_order"
 
@@ -158,6 +166,13 @@ if scen == "Cbudget":
         vehicles.loc[idx, "work_end"] = min(best_s + int(dur[idx]), 24)
     print(f"Cbudget: reassigned preserving {int(dur.sum())} veh-h total (same in-window total as Base)")
 
+if _m_cs:
+    vehicles = pd.read_csv(args.sched_file)
+    _sh = int((vehicles.work_end - vehicles.work_start).sum())
+    _pk = int(max(((vehicles.work_start <= h) & (vehicles.work_end > h)).sum() for h in range(6, 24)))
+    assert _pk <= 613, f"schedule exceeds fleet: peak {_pk} > 613"
+    print(f"Cs: {os.path.basename(args.sched_file)} — {len(vehicles)} shifts, {_sh} veh-h, peak on-duty {_pk}")
+
 if args.supply < 1.0:
     vehicles = vehicles.sample(frac=args.supply, random_state=1000 + i).reset_index(drop=True)
 
@@ -175,6 +190,7 @@ if args.dwell_sigma > 0: _variants.append(f"ds{args.dwell_sigma:g}")
 if args.year != 2023: _variants.append("y24")
 if args.fleet_year and args.fleet_year != args.year: _variants.append(f"f{args.fleet_year % 100}")
 if args.timing: _variants.append("tm")
+if _m_cs: _variants.append(os.path.splitext(os.path.basename(args.sched_file))[0].replace("sched_", ""))
 label = scen + ("_" + "-".join(_variants) if _variants else "")
 
 simul_configs = dict(base_configs)
